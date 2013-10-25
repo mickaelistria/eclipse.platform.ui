@@ -20,7 +20,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.internal.resources.WorkspaceRoot;
 import org.eclipse.core.resources.IContainer;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IPath;
@@ -63,6 +66,7 @@ import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.dialogs.FileSystemElement;
 import org.eclipse.ui.dialogs.WizardResourceImportPage;
 import org.eclipse.ui.internal.ide.IDEWorkbenchMessages;
+import org.eclipse.ui.internal.ide.IDEWorkbenchPlugin;
 import org.eclipse.ui.internal.ide.dialogs.IElementFilter;
 import org.eclipse.ui.internal.ide.dialogs.RelativePathVariableGroup;
 import org.eclipse.ui.internal.ide.filesystem.FileSystemStructureProvider;
@@ -143,6 +147,8 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
 	private int linkedResourceGroupHeight= -1;
 
 	private Composite linkedResourceParent;
+	
+	private File source;
 
 
     /**
@@ -270,8 +276,31 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
      * Method declared on IDialogPage.
      */
     public void createControl(Composite parent) {
-        super.createControl(parent);
-        validateSourceGroup();
+            initializeDialogUnits(parent);
+
+            Composite composite = new Composite(parent, SWT.NULL);
+            composite.setLayout(new GridLayout());
+            composite.setLayoutData(new GridData(GridData.VERTICAL_ALIGN_FILL
+                    | GridData.HORIZONTAL_ALIGN_FILL));
+            composite.setSize(composite.computeSize(SWT.DEFAULT, SWT.DEFAULT));
+            composite.setFont(parent.getFont());
+
+            createRootDirectoryGroup(composite);
+
+            createDestinationGroup(composite);
+
+            createFileSelectionGroup(composite);
+            createButtonsGroup(composite);
+            createOptionsGroup(composite);
+
+            restoreWidgetValues();
+            updateWidgetEnablements();
+            setPageComplete(determinePageCompletion());
+            setErrorMessage(null);	// should not initially have error message
+
+            setControl(composite);
+
+            validateSourceGroup();
         PlatformUI.getWorkbench().getHelpSystem().setHelp(getControl(),
                 IDataTransferHelpContextIds.FILE_SYSTEM_IMPORT_WIZARD_PAGE);
     }
@@ -392,10 +421,9 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
         );
         relativePathVariableGroup.createContents(relativeGroup);
         
-        
         updateWidgetEnablements();
 		relativePathVariableGroup.setSelection(true);
-
+		
 		return linkedResourceComposite;
 
     }
@@ -460,6 +488,11 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
                 updateFromSourceField();
             }
         });
+        sourceNameField.addModifyListener(new ModifyListener() {
+			public void modifyText(ModifyEvent e) {
+				updateFromSourceField();
+			}
+		});
 
         sourceNameField.addKeyListener(new KeyListener() {
             /*
@@ -521,8 +554,12 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
      */
 
     private void updateFromSourceField() {
-
-        setSourceName(sourceNameField.getText());
+        String sourceLocation = sourceNameField.getText();
+		this.source = new File(sourceLocation);
+		setSourceName(sourceLocation);
+		if (this.source.exists()) {
+        	this.newProjectNameField.setText(source.getName());
+        }
         //Update enablements when this is selected
         updateWidgetEnablements();
         fileSystemStructureProvider.clearVisitedDirs();
@@ -1180,9 +1217,17 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
      */
     protected void updateWidgetEnablements() {
         super.updateWidgetEnablements();
-        enableButtonGroup(ensureSourceIsValid());
+        
+        enableButtonGroup(ensureSourceIsValid() && this.resourcesRadio.getSelection());
+        if (newProjectNameField.isEnabled()) {
+			newProjectNameField.setEnabled(!isCurrentSourceAnEclipseProject());
+        }
 
-    	if (createLinksInWorkspaceButton != null) {
+       	this.overwriteExistingResourcesCheckbox.setEnabled(this.resourcesRadio.getSelection());
+       	this.createTopLevelFolderCheckbox.setEnabled(this.resourcesRadio.getSelection());
+       	
+       	if (this.createLinksInWorkspaceButton != null) {
+       		this.createLinksInWorkspaceButton.setEnabled(this.resourcesRadio.getSelection());
 			IPath path = getContainerFullPath();
 	    	if (path != null && relativePathVariableGroup != null) {
 				IResource target = ResourcesPlugin.getWorkspace().getRoot().findMember(path);
@@ -1199,6 +1244,13 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
     	}
     }
 
+	/**
+	 * @return
+	 */
+	private boolean isCurrentSourceAnEclipseProject() {
+		return this.source != null && new File(this.source, IProjectDescription.DESCRIPTION_FILE_NAME).exists();
+	}
+
     /**
      *	Answer a boolean indicating whether self's source specification
      *	widgets currently all contain valid values.
@@ -1209,6 +1261,20 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
             setMessage(SOURCE_EMPTY_MESSAGE);
             enableButtonGroup(false);
             return false;
+        }
+        
+        if (this.newProjectRadio.getSelection()) {
+        	String projectName = this.newProjectNameField.getText();
+        	if (!ResourcesPlugin.getWorkspace().validateName(projectName, IResource.PROJECT).isOK()) {
+        		setErrorMessage(DataTransferMessages.WizardProjectsImportPage_invalidProjectName);
+        		return false;
+        	}
+        	if (ResourcesPlugin.getWorkspace().getRoot().getProject(projectName).exists()) {
+        		setErrorMessage(IDEWorkbenchMessages.WizardNewProjectCreationPage_projectExistsMessage);
+        		return false;
+        	}
+        	setErrorMessage(null);
+        	return true;
         }
 
         if (sourceConflictsWithDestination(new Path(sourceDirectory.getPath()))) {
@@ -1267,5 +1333,43 @@ public class WizardFileSystemResourceImportPage1 extends WizardResourceImportPag
         // WizardResourceImportPage
         return false;
     }
-
+    
+    /*
+     * @see WizardDataTransferPage.determinePageCompletion.
+     */
+    protected boolean determinePageCompletion() {
+    	if (this.newProjectRadio.getSelection()) {
+    		String projectName = this.newProjectNameField.getText();
+    		if (!ResourcesPlugin.getWorkspace().validateName(projectName, IResource.PROJECT).isOK()) {
+    			setErrorMessage("Invalid project name");
+	            return false;
+    		} else if (ResourcesPlugin.getWorkspace().getRoot().getProject(this.newProjectNameField.getText()).exists()) {
+    			setErrorMessage("Project with this name already exists");
+	            return false;
+    		}
+    	} else if (this.resourcesRadio.getSelection()) {
+	        //Check for valid projects before making the user do anything 
+	        if (noOpenProjects()) {
+	            setErrorMessage(IDEWorkbenchMessages.WizardImportPage_noOpenProjects);
+	            return false;
+	        }
+        }
+        return super.determinePageCompletion();
+    }
+    
+    /**
+     * Returns whether or not the passed workspace has any 
+     * open projects
+     * @return boolean
+     */
+    private boolean noOpenProjects() {
+        IProject[] projects = IDEWorkbenchPlugin.getPluginWorkspace().getRoot()
+                .getProjects();
+        for (int i = 0; i < projects.length; i++) {
+            if (projects[i].isOpen()) {
+				return false;
+			}
+        }
+        return true;
+    }
 }

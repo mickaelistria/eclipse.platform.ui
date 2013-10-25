@@ -125,6 +125,9 @@ public class ResourceTreeAndListGroup extends EventManager implements
             treeViewer.setSelection(new StructuredSelection(primary));
         }
         treeViewer.getControl().setFocus();
+        
+        treeViewer.getControl().setEnabled(false);
+        listViewer.getControl().setEnabled(false);
     }
 
     /**
@@ -241,6 +244,7 @@ public class ResourceTreeAndListGroup extends EventManager implements
      */
     protected void createListViewer(Composite parent, boolean useHeightHint) {
         listViewer = CheckboxTableViewer.newCheckList(parent, SWT.BORDER);
+        listViewer.getControl().setEnabled(false);
         GridData data = new GridData(GridData.FILL_BOTH);
         if (useHeightHint) {
 			data.heightHint = PREFERRED_HEIGHT;
@@ -668,6 +672,13 @@ public class ResourceTreeAndListGroup extends EventManager implements
      */
     public Table getListTable() {
         return this.listViewer.getTable();
+    }
+    
+    /**
+     * @return the Tree the Tree Viewer uses 
+     */
+    public Tree getTree() {
+    	return this.treeViewer.getTree();
     }
 
     /**
@@ -1177,6 +1188,14 @@ public class ResourceTreeAndListGroup extends EventManager implements
         }
         	
     }
+
+	/**
+	 * @param resourcesRadio
+	 */
+	public void setEnabled(boolean enabled) {
+		this.listViewer.getControl().setEnabled(enabled);
+		this.treeViewer.getControl().setEnabled(enabled);
+	}
 
 }
 

@@ -402,6 +402,7 @@ public class IDEWorkbenchMessages extends NLS {
 	public static String WizardImportPage_folderMustExist;
 	public static String WizardImportPage_errorDialogTitle;
 	public static String WizardImportPage_folder;
+	public static String WizardImportPage_project;
 	public static String WizardImportPage_browseLabel;
 	public static String WizardImportPage_browse2;
 	public static String WizardImportPage_selectFolderLabel;
