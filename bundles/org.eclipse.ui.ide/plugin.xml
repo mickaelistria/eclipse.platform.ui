@@ -61,6 +61,16 @@
          </keywordReference>
       </wizard>
       <wizard
+            name="%ImportWizards.DirectoryAsProject"
+            icon="$nl$/icons/full/etool16/newprj_wiz.gif"
+            category="org.eclipse.ui.Basic"            
+            class="org.eclipse.ui.wizards.datatransfer.ImportDirectoryAsProjectWizard"
+            id="org.eclipse.ui.wizards.import.ExternalProject">
+         <description>
+            %ImportWizards.DirectoryAsProjectDescription
+         </description>
+      </wizard>
+      <wizard
             name="%ImportWizards.ZipFile"
             icon="$nl$/icons/full/etool16/importzip_wiz.gif"
             category="org.eclipse.ui.Basic"            
@@ -1029,6 +1039,10 @@
       <key
             commandId="org.eclipse.ui.navigate.openResource"
             sequence="M1+M2+R"
+            schemeId="org.eclipse.ui.defaultAcceleratorConfiguration" />
+      <key
+            commandId="org.eclipse.ui.edit.text.openLocalFile"
+            sequence="M1+O"
             schemeId="org.eclipse.ui.defaultAcceleratorConfiguration" />
       <key
             commandId="org.eclipse.ui.navigate.openResource"
