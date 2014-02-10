@@ -63,6 +63,7 @@
 	          <contentExtension pattern="org.eclipse.ui.navigator.resources.filters.*"/>
            <contentExtension pattern="org.eclipse.ui.navigator.resources.linkHelper"/>
            <contentExtension pattern="org.eclipse.ui.navigator.resources.workingSets"/>
+           <contentExtension pattern="org.eclipse.ui.navigator.resources.nestedProjects"/>
           </includes>
        </viewerContentBinding>
        <viewerActionBinding
@@ -332,6 +333,43 @@
                class="org.eclipse.ui.internal.navigator.workingsets.WorkingSetSorter"
                id="org.eclipse.ui.navigator.resources.workingSets.sorter"/>  
       </navigatorContent>
+      
+      <!-- Nested Projects -->
+      <navigatorContent
+            activeByDefault="true"
+            contentProvider="org.eclipse.ui.internal.navigator.resources.nestedProjects.NestedProjectsContentProvider"
+            id="org.eclipse.ui.navigator.resources.nestedProjects"
+            labelProvider="org.eclipse.ui.internal.navigator.resources.nestedProjects.NestedProjectsLabelProvider"
+            name="%filters.nestedProjects.name"
+            priority="higher">
+         <enablement>
+		         <or>         
+		            <instanceof 
+		                  	value="org.eclipse.core.resources.IContainer" /> 
+		         </or>
+         </enablement>
+         <possibleChildren>
+            <instanceof value="org.eclipse.core.resources.IProject"/>
+         </possibleChildren>
+      </navigatorContent>
+      <commonFilter
+            id="org.eclipse.ui.navigator.resources.filters.nestedProjects"
+            name="%filters.nestedProjects.name"
+            description="%filters.nestedProjects.description" 
+            class="org.eclipse.ui.internal.navigator.resources.nestedProjects.NestedProjectsFilter" 
+            activeByDefault="true"
+            visibleInUI="true"
+           >
+      </commonFilter>
+      <actionProvider
+          class="org.eclipse.ui.internal.navigator.resources.nestedProjects.NestedProjectActionProvider"
+          id="org.eclipse.ui.navigator.resources.actions.NestedProjectActions">
+          <enablement>
+                <or>
+					<adapt type="org.eclipse.core.resources.IFolder" />	 
+				</or>
+         </enablement>
+      </actionProvider>     
       
    </extension>
     <extension
