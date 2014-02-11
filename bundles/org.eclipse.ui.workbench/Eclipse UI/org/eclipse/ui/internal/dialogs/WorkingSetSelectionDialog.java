@@ -16,7 +16,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.viewers.ArrayContentProvider;
@@ -249,7 +248,8 @@ public class WorkingSetSelectionDialog extends AbstractWorkingSetDialog {
         addModifyButtons(viewerComposite);
         
         addSelectionButtons(composite);
-        
+
+		addDefaultWorkingSetConfiguration(composite);
 
 		listViewer.setInput(Arrays.asList(WorkbenchPlugin.getDefault()
 				.getWorkingSetManager().getWorkingSets()));

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
 import org.eclipse.core.commands.common.EventManager;
 import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.IAdaptable;
@@ -101,6 +100,8 @@ public abstract class AbstractWorkingSetManager extends EventManager implements
 	});
     
     private List recentWorkingSets = new ArrayList();
+	private boolean useDefaultWorkingSet;
+	private IWorkingSet defaultWorkingSet;
 
     private BundleContext bundleContext;
     private Map/*<String, IWorkingSetUpdater>*/ updaters= new HashMap();
@@ -129,6 +130,9 @@ public abstract class AbstractWorkingSetManager extends EventManager implements
 		public void dispose() {
 		}
 	};
+
+	private static final String TAG_USE_DEFAULT = "useDefault"; //$NON-NLS-1$
+	private static final String TAG_DEFAULT_WORKING_SET_NAME = "default"; //$NON-NLS-1$
 		
     /**
      * Returns the descriptors for the given editable working set ids. If an id
@@ -305,6 +309,31 @@ public abstract class AbstractWorkingSetManager extends EventManager implements
     public IWorkingSet[] getRecentWorkingSets() {
         return (IWorkingSet[]) recentWorkingSets.toArray(new IWorkingSet[recentWorkingSets.size()]);
     }
+
+	public boolean useDefaultWorkingSet() {
+		return this.useDefaultWorkingSet;
+	}
+
+	public void setUseDefaultWorkingSet(boolean useDefaultWorkingSet) {
+		if (this.useDefaultWorkingSet != useDefaultWorkingSet) {
+			this.useDefaultWorkingSet = useDefaultWorkingSet;
+			firePropertyChange(IWorkingSetManager.CHANGE_WORKING_SET_USEDEFAULT,
+					!this.useDefaultWorkingSet, this.useDefaultWorkingSet);
+		}
+	}
+
+	public IWorkingSet getDefaultWorkingSet() {
+		return this.defaultWorkingSet;
+	}
+
+	public void setDefaultWorkingSet(IWorkingSet workingSet) {
+		if (workingSet != this.defaultWorkingSet) {
+			IWorkingSet previous = this.defaultWorkingSet;
+			this.defaultWorkingSet = workingSet;
+			firePropertyChange(IWorkingSetManager.CHANGE_WORKING_SET_DEFAULT, previous,
+					this.defaultWorkingSet);
+		}
+	}
 
     /**
      * Adds the specified working set to the list of recently used
@@ -597,6 +626,38 @@ public abstract class AbstractWorkingSetManager extends EventManager implements
         }
     }
 
+	/**
+	 * Saves the configuration for default working set
+	 */
+	protected void saveDefaultWorkingSet(IMemento memento) {
+		memento.putBoolean(AbstractWorkingSetManager.TAG_USE_DEFAULT, this.useDefaultWorkingSet);
+		if (this.defaultWorkingSet != null) {
+			memento.putString(AbstractWorkingSetManager.TAG_DEFAULT_WORKING_SET_NAME,
+					this.defaultWorkingSet.getName());
+		}
+    }
+
+	/**
+	 * Restores the configuration for default working set
+	 * 
+	 * @param memento
+	 *            the persistence store
+	 */
+	protected void restoreDefaultWorkingSet(IMemento memento) {
+		Boolean bool = memento.getBoolean(AbstractWorkingSetManager.TAG_USE_DEFAULT);
+		if (bool != null) {
+			setUseDefaultWorkingSet(bool.booleanValue());
+		}
+		String defaultWorkingSetName = memento
+				.getString(AbstractWorkingSetManager.TAG_DEFAULT_WORKING_SET_NAME);
+		if (defaultWorkingSetName != null) {
+			IWorkingSet workingSet = getWorkingSet(defaultWorkingSetName);
+			if (workingSet != null) {
+				setDefaultWorkingSet(workingSet);
+			}
+		}
+    }
+
     //---- user interface support -----------------------------------------------------
     
     /**
@@ -804,14 +865,18 @@ public abstract class AbstractWorkingSetManager extends EventManager implements
 	public void saveState(File stateFile) throws IOException {
 		XMLMemento memento = XMLMemento
 				.createWriteRoot(IWorkbenchConstants.TAG_WORKING_SET_MANAGER);
-		saveWorkingSetState(memento);
-		saveMruList(memento);
-	
+		saveState(memento);
+		
 		FileOutputStream stream = new FileOutputStream(stateFile);
 		OutputStreamWriter writer = new OutputStreamWriter(stream, "utf-8"); //$NON-NLS-1$
 		memento.save(writer);
 		writer.close();
+	}
 	
+	public void saveState(IMemento memento) {
+		saveWorkingSetState(memento);
+		saveMruList(memento);
+		saveDefaultWorkingSet(memento);
 	}
 	
 	/* (non-Javadoc)

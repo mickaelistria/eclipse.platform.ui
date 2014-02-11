@@ -19,8 +19,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.eclipse.jface.dialogs.IDialogConstants;
+import org.eclipse.jface.fieldassist.ControlDecoration;
+import org.eclipse.jface.fieldassist.FieldDecorationRegistry;
+import org.eclipse.jface.viewers.ArrayContentProvider;
+import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
+import org.eclipse.jface.viewers.SelectionChangedEvent;
+import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.window.Window;
 import org.eclipse.jface.wizard.WizardDialog;
 import org.eclipse.swt.SWT;
@@ -70,22 +76,25 @@ public abstract class AbstractWorkingSetDialog extends SelectionDialog
 
 	private IWorkingSet[] result;
 
-	private List addedWorkingSets;
+	private List<IWorkingSet> addedWorkingSets;
 
-	private List removedWorkingSets;
+	private List<IWorkingSet> removedWorkingSets;
 
 	private Map editedWorkingSets;
 
 	private List removedMRUWorkingSets;
 
-	private Set workingSetIds;
+	private Set<String> workingSetIds;
 	
 	private boolean canEdit;
+	private Button useDefaultWorkingSetCheckbox;
+	private ComboViewer defaultWorkingSetSelector;
+	private ControlDecoration missingDefaultWorkingSetDecoration;
 
 	protected AbstractWorkingSetDialog(Shell parentShell, String[] workingSetIds, boolean canEdit) {
 		super(parentShell);
 		if (workingSetIds != null) {
-			this.workingSetIds = new HashSet();
+			this.workingSetIds = new HashSet<String>();
 			for (int i = 0; i < workingSetIds.length; i++) {
 				this.workingSetIds.add(workingSetIds[i]);
 			}
@@ -192,6 +201,37 @@ public abstract class AbstractWorkingSetDialog extends SelectionDialog
 		});
 	}
 	
+	protected void addDefaultWorkingSetConfiguration(Composite composite) {
+		Composite line = new Composite(composite, SWT.NONE);
+		line.setLayout(new GridLayout(2, false));
+		this.useDefaultWorkingSetCheckbox = new Button(line, SWT.CHECK);
+		this.useDefaultWorkingSetCheckbox
+				.setText(WorkbenchMessages.WorkingSetSelectionDialog_defaultWorkingSet);
+		this.defaultWorkingSetSelector = new ComboViewer(line);
+		this.defaultWorkingSetSelector.setLabelProvider(new WorkingSetLabelProvider());
+		this.defaultWorkingSetSelector.setContentProvider(new ArrayContentProvider());
+		this.defaultWorkingSetSelector.addFilter(new WorkingSetFilter(null));
+		IWorkingSet[] workingSets = PlatformUI.getWorkbench().getWorkingSetManager()
+				.getWorkingSets();
+		defaultWorkingSetSelector.setInput(workingSets);
+		this.missingDefaultWorkingSetDecoration = new ControlDecoration(
+				this.defaultWorkingSetSelector.getControl(), SWT.TOP | SWT.LEFT);
+		this.missingDefaultWorkingSetDecoration.setImage(FieldDecorationRegistry.getDefault()
+				.getFieldDecoration(FieldDecorationRegistry.DEC_ERROR).getImage());
+		// workingSetSelector.setFilters(new ViewerFilter[] { new Filter() });
+		this.useDefaultWorkingSetCheckbox.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				updateButtonAvailability();
+			}
+		});
+		this.defaultWorkingSetSelector.addSelectionChangedListener(new ISelectionChangedListener() {
+			public void selectionChanged(SelectionChangedEvent event) {
+				updateButtonAvailability();
+			}
+		});
+	}
+
 	/**
 	 * Select all working sets.
 	 */
@@ -249,8 +289,7 @@ public abstract class AbstractWorkingSetDialog extends SelectionDialog
 				.getWorkingSetManager();
 		String ids[] = null;
 		if (workingSetIds != null) {
-			ids = (String[]) workingSetIds.toArray(new String[workingSetIds
-					.size()]);
+			ids = workingSetIds.toArray(new String[workingSetIds.size()]);
 		}
 		IWorkingSetNewWizard wizard = manager.createWorkingSetNewWizard(ids);
 		// the wizard can never be null since we have at least a resource
@@ -287,6 +326,23 @@ public abstract class AbstractWorkingSetDialog extends SelectionDialog
 		}
 		if (!(deselectAllButton == null || deselectAllButton.isDisposed())){
 			deselectAllButton.setEnabled(enable);
+		}
+
+		if (this.useDefaultWorkingSetCheckbox != null
+				&& !this.useDefaultWorkingSetCheckbox.isDisposed()) {
+			if (!enable) {
+				this.useDefaultWorkingSetCheckbox.setSelection(false);
+			}
+			this.useDefaultWorkingSetCheckbox.setEnabled(enable);
+		}
+		if (this.defaultWorkingSetSelector != null
+				&& !this.defaultWorkingSetSelector.getControl().isDisposed()) {
+			this.defaultWorkingSetSelector.setInput(PlatformUI.getWorkbench()
+					.getWorkingSetManager().getWorkingSets());
+			if (!enable) {
+				this.defaultWorkingSetSelector.setSelection(new StructuredSelection());
+			}
+			this.defaultWorkingSetSelector.getControl().setEnabled(enable);
 		}
 	}
 
@@ -361,7 +417,8 @@ public abstract class AbstractWorkingSetDialog extends SelectionDialog
 	 * Updates the modify buttons' enabled state based on the current seleciton.
 	 */
 	protected void updateButtonAvailability() {
-		List selection = getSelectedWorkingSets();
+
+		List<IWorkingSet> selection = getSelectedWorkingSets();
 		boolean hasSelection = selection != null && !selection.isEmpty();
 		boolean hasSingleSelection = hasSelection;
 		WorkingSetRegistry registry = WorkbenchPlugin.getDefault()
@@ -376,15 +433,30 @@ public abstract class AbstractWorkingSetDialog extends SelectionDialog
 		if (hasSelection) {
 			hasSingleSelection = selection.size() == 1;
 			if (hasSingleSelection) {
-				selectedWorkingSet = (IWorkingSet) selection
-						.get(0);
+				selectedWorkingSet = selection.get(0);
 			}
 		}
 		if (canEdit)
 			detailsButton.setEnabled(hasSingleSelection
 				&& selectedWorkingSet.isEditable());
 
-		getOkButton().setEnabled(true);
+		boolean missingDefaultWorkingSet = false;
+		if (this.defaultWorkingSetSelector != null
+				&& !this.defaultWorkingSetSelector.getControl().isDisposed()) {
+			defaultWorkingSetSelector.getControl().setEnabled(
+					useDefaultWorkingSetCheckbox.getSelection());
+			missingDefaultWorkingSet = this.useDefaultWorkingSetCheckbox != null
+				&& !this.useDefaultWorkingSetCheckbox.isDisposed()
+				&& this.useDefaultWorkingSetCheckbox.getSelection()
+				&& this.defaultWorkingSetSelector.getSelection().isEmpty();
+			if (missingDefaultWorkingSet) {
+				this.missingDefaultWorkingSetDecoration.show();
+			} else {
+				this.missingDefaultWorkingSetDecoration.hide();
+			}
+		}
+		
+		getOkButton().setEnabled(!missingDefaultWorkingSet);
 	}
 
 	/**

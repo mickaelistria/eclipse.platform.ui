@@ -40,18 +40,11 @@ public class LocalWorkingSetManager extends AbstractWorkingSetManager implements
 	/**
 	 * {@inheritDoc}
 	 */
-	public void saveState(IMemento memento) {
-        saveWorkingSetState(memento);
-        saveMruList(memento);
-	}
-	
-	/**
-	 * {@inheritDoc}
-	 */
 	public void restoreState(IMemento memento) {
 		Assert.isNotNull(memento);
 		Assert.isTrue(getWorkingSets().length == 0);
         restoreWorkingSetState(memento);
         restoreMruList(memento);
+		restoreDefaultWorkingSet(memento);
 	}
 }
